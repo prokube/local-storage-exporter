@@ -1,26 +1,75 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-hostpath
+  name: local-storage-exporter-deployment
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: nginx-hostpath
+      app: local-storage-exporter
   template:
     metadata:
       labels:
-        app: nginx-hostpath
+        app: local-storage-exporter
     spec:
+      serviceAccountName: local-storage-exporter-serviceaccount
       containers:
-      - name: nginx
-        image: nginx:latest
-        volumeMounts:
-        - name: node-data
-          mountPath: /volumes  # Where it appears in container
+        - name: local-storage-exporter
+          image: local-storage-exporter:latest
+          imagePullPolicy: Never
+          volumeMounts:
+            - name: node-data
+              mountPath: /volumes # Where it appears in container
+          ports:
+            - containerPort: 9100
+              name: metrics
       volumes:
-      - name: node-data
-        hostPath:
-          path: /var/openebs/local/  # Path on host node
-          # path: /var/snap/microk8s/common/default-storage
-          type: Directory  # Ensures directory exists
+        - name: node-data
+          hostPath:
+            path: /var/openebs/local/ # Path on host node
+            # path: /var/snap/microk8s/common/default-storage
+            # path: /var/local-path-provisioner
+            type: Directory # Ensures directory exists
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: local-storage-exporter-serviceaccount
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: local-storage-exporter-clusterrole
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: local-storage-exporter-clusterrolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: local-storage-exporter-clusterrole
+subjects:
+  - kind: ServiceAccount
+    name: local-storage-exporter-serviceaccount
+    namespace: default
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: local-storage-exporter-service
+  labels:
+    app: local-storage-exporter
+spec:
+  selector:
+    app: local-storage-exporter
+  ports:
+    - protocol: TCP
+      name: metrics
+      port: 9100
+      targetPort: metrics
