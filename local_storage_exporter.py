@@ -4,6 +4,7 @@ import logging
 import subprocess
 import time
 import re
+import os
 
 from kubernetes import client, config
 from prometheus_client import Gauge, start_http_server
@@ -27,12 +28,14 @@ class Volume:
     storage_capacity: str
 
 
+# fmt: off
 # Compile the regex pattern once
 STORAGE_CAPACITY_PATTERN = re.compile(r"(\d+)([a-zA-Z]+)")
 STORAGE_UNITS = {
     "Ki": 1024, "Mi": 1024**2, "Gi": 1024**3, "Ti": 1024**4, "Pi": 1024**5, "Ei": 1024**6,
-    "k": 10**3, "M": 10**6, "G": 10**9, "T": 10**12, "P": 10**15, "E": 10**18
+    "k": 10**3, "M": 10**6,    "G": 10**9,    "T": 10**12,   "P": 10**15,   "E": 10**18
 }
+# fmt: on
 def convert_storage_capacity_to_bytes(storage_capacity: str) -> int:
     global STORAGE_CAPACITY_PATTERN
     global STORAGE_UNITS
@@ -47,8 +50,9 @@ def convert_storage_capacity_to_bytes(storage_capacity: str) -> int:
 class LocalStorageExporter:
     gauge: Gauge
     k8s_client: client.CoreV1Api
+    storage_class_name: str
 
-    def __init__(self, incluster: bool = True, config_file: str | None = None):
+    def __init__(self, storage_class_name: str, incluster: bool = True, config_file: str | None = None, ):
         try:
             if incluster:
                 config.load_incluster_config()
@@ -61,12 +65,12 @@ class LocalStorageExporter:
             _logger.error(f"Failed to load k8s config: {e}")
             raise
 
-        self.volumes = []
         self.gauge = Gauge(
             name="lse_pv_used_bytes",
             documentation="The amount of bytes used by local storage volume",
             labelnames=["pvc_name", "pv_name", "storage_path", "storage_capacity"],
         )
+        self.storage_class_name = storage_class_name
 
     def get_volumes(self) -> list[Volume]:
         volumes = []
@@ -78,7 +82,9 @@ class LocalStorageExporter:
                         pvc_name=pv.spec.claim_ref.name,
                         pv_name=pv.metadata.name,
                         storage_path=pv.spec.local.path,
-                        storage_capacity=convert_storage_capacity_to_bytes(pv.spec.capacity["storage"]),
+                        storage_capacity=convert_storage_capacity_to_bytes(
+                            pv.spec.capacity["storage"]
+                        ),
                     )
                 )
         return volumes
@@ -101,7 +107,7 @@ class LocalStorageExporter:
     def update_metrics(self):
         volumes = self.get_volumes()
         for volume in volumes:
-            usage = self.get_volume_usage(volume)
+            usage = LocalStorageExporter.get_volume_usage(volume)
             if usage is not None:
                 self.gauge.labels(
                     volume.pvc_name,
@@ -119,23 +125,16 @@ class LocalStorageExporter:
 
 
 def main():
-    lse = LocalStorageExporter()
+    storage_class_name = os.environ.get("STORAGE_CLASS_NAME")
     port = 9100
+    _logger.info(f"Given Storageclass name: {storage_class_name}")
+    
+    lse = LocalStorageExporter(storage_class_name=storage_class_name)    
     start_http_server(port)
     _logger.info(f"Started local storage exporter on port {port}")
     while True:
         lse.update_metrics()
         time.sleep(60)
-
-    volumes = lse.get_volumes()
-    total = 0
-    for v in volumes:
-        # print(lme.get_volume_usage(v))
-        result = lse.get_volume_usage(v)
-        total += result if result is not None else 0
-        print(result, v.pv_name, v.pvc_name)
-
-    print(f"total: {total}")
 
 
 if __name__ == "__main__":

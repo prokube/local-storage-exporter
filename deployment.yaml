@@ -23,6 +23,9 @@ spec:
           ports:
             - containerPort: 9100
               name: metrics
+          env:
+            - name: STORAGE_CLASS_NAME
+              value: "openebs-hostpath"
       volumes:
         - name: node-data
           hostPath:
