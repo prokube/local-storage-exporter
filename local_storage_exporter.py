@@ -167,8 +167,9 @@ class LocalStorageExporter:
 def main():
     try:
         storage_class_name = os.environ.get("STORAGE_CLASS_NAME")
-        port = 9100
-        _logger.info(f"Given Storageclass name: {storage_class_name}")
+        port = os.environ.get("METRICS_PORT", 9100)
+        _logger.info(f"Storageclass name: {storage_class_name}")
+        _logger.info(f"Metrics port: {port}")
 
         lse = LocalStorageExporter(storage_class_name=storage_class_name)
         start_http_server(port)
