@@ -46,7 +46,7 @@ class LocalStorageExporter:
     gauge: Gauge
     k8s_client: client.CoreV1Api
     storage_class_name: str
-    hostpath_mount_paths: list[Path]
+    host_path_to_volume_mount: dict[Path, Path]
 
     def __init__(
         self,
@@ -66,10 +66,10 @@ class LocalStorageExporter:
             _logger.error(f"Failed to load k8s config: {e}")
             raise
 
-        self.hostpath_mount_paths = self.find_hostpath_mount_paths()
-        if len(self.hostpath_mount_paths) == 0:
-            _logger.error("Failed to find any hostpath mount path")
-            raise Exception("Failed to find any hostpath mount path")
+        self.host_path_to_volume_mount = self.find_host_path_to_volume_mount()
+        if len(self.host_path_to_volume_mount) == 0:
+            _logger.error("Could not find any hostPath mounted volume.")
+            raise RuntimeError("no hostPath mounted volume found")
 
         self.gauge = Gauge(
             name="local_storage_pv_used_bytes",
@@ -101,7 +101,7 @@ class LocalStorageExporter:
         pod: V1Pod = pods.items[0]
         return pod
 
-    def find_hostpath_mount_paths(self) -> dict[Path, Path]:
+    def find_host_path_to_volume_mount(self) -> dict[Path, Path]:
         pod = self.get_pod()
         assert len(pod.spec.containers) == 1, "Expected to find one container in pod"
         container = pod.spec.containers[0]
@@ -122,26 +122,32 @@ class LocalStorageExporter:
 
     def get_pv_usage(self, pv: V1PersistentVolume) -> int | None:
         if pv.spec.local is not None:
-            base_name = os.path.basename(pv.spec.local.path)
-            dir_name = os.path.dirname(pv.spec.local.path)
+            pv_path = Path(pv.spec.local.path)
         elif pv.spec.host_path is not None:
-            base_name = os.path.basename(pv.spec.host_path.path)
-            dir_name = os.path.dirname(pv.spec.host_path.path)
+            pv_path = Path(pv.spec.host_path.path)
         else: 
-            _logger.error(f"PV {pv.metadata.name} does not have local or hostpath spec")
-            return
-        path: Path = self.hostpath_mount_paths.get(Path(dir_name))
-        if path is None:
-            _logger.error(f"Failed to find hostpath mount path for {dir_name}")
+            _logger.error(f"PV {pv.metadata.name} does not have local or host path spec")
             return None
-        path = path / base_name    
-        if not path.exists():
-            _logger.error(f"Path {path} does not exist")
+        
+        # Find the local path for the mounted volume
+        local_path: Path = None
+        for parent in pv_path.parents:
+            if parent in self.host_path_to_volume_mount:
+                relative = pv_path.relative_to(parent)
+                local_path = self.host_path_to_volume_mount[parent] / relative
+                break
+
+        if local_path is None:
+            _logger.error(f"Could not find host path mount path for {pv_path}. Did you mount the correct path?")
+            return None
+        if not local_path.exists():
+            # Should not happen, but just in case
+            _logger.error(f"Path {local_path} does not exist")
             return None
         
         try:
             result = result = subprocess.run(
-                ["du", "-sb", os.fspath(path)],
+                ["du", "-sb", os.fspath(local_path)],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -149,7 +155,7 @@ class LocalStorageExporter:
             size = result.stdout.split("\t")[0]
             return int(size)
         except Exception as e:
-            _logger.error(f"Failed to get volume usage for {path}: {e}")
+            _logger.error(f"Failed to get volume usage for {local_path}: {e}")
             return None
 
     def update_metrics(self):
@@ -177,7 +183,7 @@ class LocalStorageExporter:
 def main():
     try:
         storage_class_name = os.environ.get("STORAGE_CLASS_NAME")
-        port = os.environ.get("METRICS_PORT", 9100)
+        port = int(os.environ.get("METRICS_PORT", 9100))
         _logger.info(f"Storageclass name: {storage_class_name}")
         _logger.info(f"Metrics port: {port}")
 
