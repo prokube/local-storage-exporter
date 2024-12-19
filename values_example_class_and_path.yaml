@@ -1,0 +1,22 @@
+storageClassNames: # must be given
+storagePath: # must be given
+
+# for openebs-hostpath
+# storageClassNames: [openebs-hostpath]
+# storagePath: /var/openebs/local/
+
+# for microk8s
+# storageClassNames: [microk8s-hostpath]
+# storagePath: /var/snap/microk8s/common/default-storage
+
+# for kind
+# storageClassNames: [standard]
+# storagePath: /var/local-path-provisioner
+
+# for minikube
+# storageClassNames: [standard]
+# storagePath: /tmp/hostpath-provisioner
+
+# for k3s
+# storageClassNames: [standard]
+# storagePath: /var/lib/rancher/k3s/storage/
