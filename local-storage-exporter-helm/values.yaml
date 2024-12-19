@@ -10,4 +10,5 @@ podMonitor:
 
 imagePullPolicy: IfNotPresent
 imagePullSecrets: []
+repository: 
 tag: latest

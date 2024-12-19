@@ -18,16 +18,20 @@ spec:
         app: {{ .Release.Name }}-local-storage-exporter
     spec:
       serviceAccountName: {{ .Release.Name }}-local-storage-exporter-serviceaccount
+      {{ if .Values.imagePullSecrets -}}
+      imagePullSecrets:
+      {{ range .Values.imagePullSecrets -}}
+        - name: {{ .name }}
+      {{ end -}}
+      {{ end -}}
       containers:
         - name: {{ .Release.Name }}-local-storage-exporter
+          {{ if .Values.repository -}}
+          image: {{ .Values.repository }}/local-storage-exporter:{{ .Values.tag }}
+          {{ else -}}
           image: local-storage-exporter:{{ .Values.tag }}
+          {{ end -}}
           imagePullPolicy: {{ .Values.imagePullPolicy }}
-          {{ if .Values.imagePullSecrets }}
-          imagePullSecrets:
-          {{ range .Values.imagePullSecrets }}
-            - name: {{ .name }}
-          {{ end }}
-          {{ end }}
           volumeMounts:
             - name: node-data
               mountPath: /volumes # Where it appears in container
