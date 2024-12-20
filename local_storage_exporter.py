@@ -43,21 +43,16 @@ def convert_storage_capacity_to_bytes(storage_capacity: str) -> int:
     return int(storage_capacity)
 
 
-@dataclass
-class MountedDiskGauges:
-    capacity: Gauge
-    used: Gauge
-    available: Gauge
-    volume_mount: Path
-
-
 class LocalStorageExporter:
     pv_used_bytes_gauge: Gauge
     pv_capacity_bytes_gauge: Gauge
-    mounted_disk_gauges: list[MountedDiskGauges] = []
+    mounted_disk_capacity_gauge: Gauge
+    mounted_disk_used_gauge: Gauge
+    mounted_disk_available_gauge: Gauge
     k8s_client: client.CoreV1Api
     storage_class_names: list[str] = []
     host_path_to_volume_mount: dict[Path, Path] = {}
+    node_name: str
 
     def __init__(
         self,
@@ -80,7 +75,9 @@ class LocalStorageExporter:
             name="local_storage_pv_used_bytes",
             documentation="The amount of bytes used by local storage volume",
             labelnames=[
+                "node_name",
                 "pvc_name",
+                "pvc_namespace",
                 "pv_name",
                 "storage_path",
                 "pv_capacity",
@@ -91,7 +88,9 @@ class LocalStorageExporter:
             name="local_storage_pv_capacity_bytes",
             documentation="The capacity of local storage volume",
             labelnames=[
+                "node_name",
                 "pvc_name",
+                "pvc_namespace",
                 "pv_name",
                 "storage_path",
                 "pv_capacity",
@@ -99,29 +98,23 @@ class LocalStorageExporter:
             ],
         )
 
-        node_name = self.get_pod().spec.node_name
-        for host_path, volume_mount in self.host_path_to_volume_mount.items():
-            self.mounted_disk_gauges.append(
-                MountedDiskGauges(
-                    capacity=Gauge(
-                        name="local_storage_mounted_disk_capacity_bytes",
-                        documentation="The capacity of the mounted disk",
-                        labelnames=["node_name", "host_path", "volume_mount_path"],
-                    ).labels(node_name, host_path, volume_mount),
-                    used=Gauge(
-                        name="local_storage_mounted_disk_used_bytes",
-                        documentation="The amount of bytes used in the mounted disk",
-                        labelnames=["node_name", "host_path", "volume_mount_path"],
-                    ).labels(node_name, host_path, volume_mount),
-                    available=Gauge(
-                        name="local_storage_mounted_disk_available_bytes",
-                        documentation="The amount of bytes available in the mounted disk",
-                        labelnames=["node_name", "host_path", "volume_mount_path"],
-                    ).labels(node_name, host_path, volume_mount),
-                    volume_mount=volume_mount,
-                )
-            )
+        self.mounted_disk_used_gauge = Gauge(
+            name="local_storage_mounted_disk_used_bytes",
+            documentation="The amount of bytes used by mounted disk",
+            labelnames=["node_name", "host_path", "volume_mount_path"],
+        )
+        self.mounted_disk_capacity_gauge = Gauge(
+            name="local_storage_mounted_disk_capacity_bytes",
+            documentation="The capacity of mounted disk",
+            labelnames=["node_name", "host_path", "volume_mount_path"],
+        )
+        self.mounted_disk_available_gauge = Gauge(
+            name="local_storage_mounted_disk_available_bytes",
+            documentation="The amount of bytes available in mounted disk",
+            labelnames=["node_name", "host_path", "volume_mount_path"],
+        )
 
+        self.node_name = self.get_pod().spec.node_name
         self.storage_class_names = storage_class_names
 
     def get_pod(self) -> V1Pod:
@@ -230,6 +223,7 @@ class LocalStorageExporter:
         for pv in pvs.items:
             usage = self.get_pv_usage(pv)
             pvc_name = pv.spec.claim_ref.name
+            pvc_namespace = pv.spec.claim_ref.namespace
             pv_name = pv.metadata.name
             storage_path = (
                 pv.spec.local.path if pv.spec.local else pv.spec.host_path.path
@@ -237,11 +231,13 @@ class LocalStorageExporter:
             pv_capacity = convert_storage_capacity_to_bytes(pv.spec.capacity["storage"])
             storage_class_name = pv.spec.storage_class_name
             pv_used_bytes_gauge = self.pv_used_bytes_gauge.labels(
-                pvc_name,
-                pv_name,
-                storage_path,
-                pv_capacity,
-                storage_class_name,
+                node_name=self.node_name,
+                pvc_name=pvc_name,
+                pvc_namespace=pvc_namespace,
+                pv_name=pv_name,
+                storage_path=storage_path,
+                pv_capacity=pv_capacity,
+                storage_class_name=storage_class_name,
             )
             if usage is not None:
                 pv_used_bytes_gauge.set(usage)
@@ -255,22 +251,33 @@ class LocalStorageExporter:
             # However this is a simple way to ensure that the metric is always updated when there was a change instead of tracking creation/deletion events
             # If we can just extract this information from the used_bytes_gauge label using promql (or different method), we can remove this gauge.
             self.pv_capacity_bytes_gauge.labels(
-                pvc_name,
-                pv_name,
-                storage_path,
-                pv_capacity,
-                storage_class_name,
+                node_name=self.node_name,
+                pvc_name=pvc_name,
+                pvc_namespace=pvc_namespace,
+                pv_name=pv_name,
+                storage_path=storage_path,
+                pv_capacity=pv_capacity,
+                storage_class_name=storage_class_name,
             ).set(pv_capacity)
 
     def update_mount_storage_metrics(self):
-        # TODO: Currently there is only one volume mount. This will be updated when multiple mounts are supported.
-        for mounted_disk_gauge in self.mounted_disk_gauges:
-            capacity, used, available = self.get_mount_storage_info(
-                mounted_disk_gauge.volume_mount
-            )
-            mounted_disk_gauge.capacity.set(capacity)
-            mounted_disk_gauge.used.set(used)
-            mounted_disk_gauge.available.set(available)
+        for host_path, volume_mount_path in self.host_path_to_volume_mount.items():
+            capacity, used, available = self.get_mount_storage_info(volume_mount_path)
+            self.mounted_disk_capacity_gauge.labels(
+                node_name=self.node_name,
+                host_path=host_path,
+                volume_mount_path=volume_mount_path,
+            ).set(capacity)
+            self.mounted_disk_used_gauge.labels(
+                node_name=self.node_name,
+                host_path=host_path,
+                volume_mount_path=volume_mount_path,
+            ).set(used)
+            self.mounted_disk_available_gauge.labels(
+                node_name=self.node_name,
+                host_path=host_path,
+                volume_mount_path=volume_mount_path,
+            ).set(available)
 
     def update_metrics(self):
         self.update_pv_metrics()
