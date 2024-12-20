@@ -21,4 +21,9 @@ image:
 
 imagePullSecrets: []
 
-replicaCount: 1
+daemonSet:
+  enable: false
+
+deployment:
+  enable: true
+  replicas: 1

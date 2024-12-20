@@ -1,13 +1,14 @@
 {{ include "validate.requiredValues" . }}
 {{ $metricsPort := include "validate.metricsPort" . }}
+{{ include "validate.imagePullPolicy" . }}
+{{ include "validate.imagePullSecrets" . }}
 ---
-{{ if .Values.deployment.enable -}}
+{{ if .Values.daemonSet.enable -}}
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
-  name: {{ .Release.Name }}-local-storage-exporter-deployment
+  name: {{ .Release.Name }}-local-storage-exporter-daemonset
 spec:
-  replicas: {{ .Values.deployment.replicas }}
   selector:
     matchLabels:
       app: {{ .Release.Name }}-local-storage-exporter
@@ -16,6 +17,12 @@ spec:
       labels:
         app: {{ .Release.Name }}-local-storage-exporter
     spec:
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists        
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+
       serviceAccountName: {{ .Release.Name }}-local-storage-exporter-serviceaccount
       {{ if .Values.imagePullSecrets -}}
       imagePullSecrets:
@@ -25,12 +32,12 @@ spec:
       {{ end -}}
       containers:
         - name: {{ .Release.Name }}-local-storage-exporter
-          {{ if .Values.image.registry -}}
-          image: {{ .Values.image.registry }}/local-storage-exporter:{{ .Values.image.tag }}
+          {{ if .Values.repository -}}
+          image: {{ .Values.repository }}/local-storage-exporter:{{ .Values.tag }}
           {{ else -}}
-          image: local-storage-exporter:{{ .Values.image.tag }}
+          image: local-storage-exporter:{{ .Values.tag }}
           {{ end -}}
-          imagePullPolicy: {{ .Values.image.imagePullPolicy }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
           volumeMounts:
             - name: node-data
               mountPath: /volumes # Where it appears in container
@@ -40,23 +47,11 @@ spec:
               name: metrics
           env:
             - name: STORAGE_CLASS_NAMES
-              value: {{ join "," .Values.storageClassNames }}
+              value: {{join "," .Values.storageClassNames }}
             - name: METRICS_PORT
               value: {{ quote $metricsPort }}
             - name: UPDATE_INTERVAL
               value: {{ quote .Values.updateInterval }}
-          livenessProbe:
-            httpGet:
-              path: /
-              port: {{ $metricsPort }}
-            initialDelaySeconds: 3
-            periodSeconds: 15
-          readinessProbe:
-            httpGet:
-              path: /
-              port: {{ $metricsPort }}
-            initialDelaySeconds: 3
-            periodSeconds: 15
       volumes:
         - name: node-data
           hostPath:
