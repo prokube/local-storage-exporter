@@ -1,12 +1,12 @@
-storageClassNames: []
-storagePath:
+storageClassNames: [openebs-hostpath]
+storagePath: /var/openebs/local/
 
 metricsPort: 9100
 serviceEnabled: true
 updateInterval: 30s
 
 serviceMonitor:
-  enabled: false
+  enabled: true
   interval: 30s
   scrapeTimeout: 10s
 podMonitor:
@@ -17,8 +17,9 @@ podMonitor:
 image:
   tag: latest
   imagePullPolicy: IfNotPresent
-  registry: 
+  registry: <registry>
 
-imagePullSecrets: []
+imagePullSecrets:
+  - name: regcred
 
 replicaCount: 1

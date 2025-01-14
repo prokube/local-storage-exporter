@@ -39,7 +39,7 @@ storagePath: /var/openebs/local/
 ```
 
 ```bash
-helm install -n <namespace> <release name> ./local-storage-exporter-helm --create-namespace --values=values.yaml
+helm install -n <namespace> <release name> ./local-storage-exporter-helm --create-namespace --values=./local-storage-exporter-helm/values.yaml
 ```
 
 After deploying the helm release, you can check if the exporter is working by port-forwarding to the created service and using a http client to check the endpoint. 
