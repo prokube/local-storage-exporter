@@ -39,7 +39,7 @@ spec:
               name: metrics
           env:
             - name: STORAGE_CLASS_NAMES
-              value: {{join "," .Values.storageClassNames }}
+              value: {{ join "," .Values.storageClassNames }}
             - name: METRICS_PORT
               value: {{ quote $metricsPort }}
             - name: UPDATE_INTERVAL
