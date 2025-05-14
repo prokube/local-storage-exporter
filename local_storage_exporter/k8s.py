@@ -52,17 +52,32 @@ class LocalStorageExporter:
         pods: V1PodList = self.k8s_client.list_namespaced_pod(
             namespace=pod_namespace, field_selector=f"metadata.name={pod_hostname}"
         )
-        assert (
-            len(pods.items) == 1
-        ), f"Expected to find one pod with name {pod_hostname} in namespace {pod_namespace}, but found {len(pods.items)}"
+        if len(pods.items) != 1:
+            pod_names = [pod.metadata.name for pod in pods.items]
+            raise LookupError(
+                f"Expected to find one pod with name '{pod_hostname}' in namespace '{pod_namespace}', but found {len(pods.items)}. Found pods: {', '.join(pod_names)}"
+            )
 
         pod: V1Pod = pods.items[0]
         return pod
 
+    @staticmethod
+    def get_container(pod: V1Pod) -> client.V1Container:
+        container_name_identifier = os.getenv(
+            "EXPORTER_CONTAINER_NAME_IDENTIFIER", "local-storage-exporter"
+        )
+        containers = [
+            c for c in pod.spec.containers if container_name_identifier in c.name
+        ]
+        if len(containers) != 1:
+            raise LookupError(
+                f"Expected to find one container with '{container_name_identifier}' in its name, but found {len(containers)}"
+            )
+        return containers[0]
+
     def find_host_path_to_volume_mount(self) -> dict[Path, Path]:
         pod = self.get_pod()
-        assert len(pod.spec.containers) == 1, "Expected to find one container in pod"
-        container = pod.spec.containers[0]
+        container = LocalStorageExporter.get_container(pod)
         mount_paths = {}
         for volume in pod.spec.volumes:
             if volume.host_path:
