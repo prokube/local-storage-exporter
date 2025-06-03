@@ -16,6 +16,12 @@ from . import utils, metrics
 _logger = utils.createLogger(__name__)
 
 class LocalStorageExporter:
+    """
+    A Kubernetes local storage exporter that monitors persistent volumes and mounted storage.
+    
+    This class provides functionality to discover and monitor local storage usage in a Kubernetes
+    cluster by examining persistent volumes and their corresponding mount points on the current node.
+    """
     k8s_client: client.CoreV1Api
     storage_class_names: list[str] = []
     host_path_to_volume_mount: dict[Path, Path] = {}
@@ -25,6 +31,19 @@ class LocalStorageExporter:
         self,
         storage_class_names: list[str],
     ):
+        """
+        Initialize the LocalStorageExporter with specified storage classes.
+        
+        Sets up Kubernetes client configuration, discovers host path to volume mount mappings,
+        and identifies the current node name where the exporter is running.
+        
+        Args:
+            storage_class_names: List of storage class names to monitor
+            
+        Raises:
+            config.ConfigException: If Kubernetes configuration cannot be loaded
+            RuntimeError: If no hostPath mounted volumes are found
+        """
         try:
             config.load_incluster_config()
             self.k8s_client = client.CoreV1Api()
@@ -42,6 +61,18 @@ class LocalStorageExporter:
         self.storage_class_names = storage_class_names
 
     def get_pod(self) -> V1Pod:
+        """
+        Get the current pod where this exporter is running.
+        
+        Uses the HOSTNAME environment variable and service account namespace to locate
+        the pod in the Kubernetes cluster.
+        
+        Returns:
+            V1Pod: The pod object representing the current exporter pod
+            
+        Raises:
+            LookupError: If exactly one pod cannot be found with the expected hostname
+        """
         pod_hostname = os.getenv("HOSTNAME")
         with open(
             "/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r"
@@ -62,6 +93,22 @@ class LocalStorageExporter:
 
     @staticmethod
     def get_container(pod: V1Pod) -> client.V1Container:
+        """
+        Get the container from the pod that is running the local storage exporter using a name identifier.
+        
+        Searches through the pod's containers to find the one with the exporter identifier
+        in its name. The identifier can be customized via the EXPORTER_CONTAINER_NAME_IDENTIFIER
+        environment variable.
+        
+        Args:
+            pod: The pod containing the containers to search
+            
+        Returns:
+            V1Container: The container running the local storage exporter
+            
+        Raises:
+            LookupError: If exactly one container cannot be found with the identifier
+        """
         container_name_identifier = os.getenv(
             "EXPORTER_CONTAINER_NAME_IDENTIFIER", "local-storage-exporter"
         )
@@ -75,6 +122,16 @@ class LocalStorageExporter:
         return containers[0]
 
     def find_host_path_to_volume_mount(self) -> dict[Path, Path]:
+        """
+        Discover the mapping between host paths and container volume mount paths.
+        
+        Examines the current pod's volumes and volume mounts to create a mapping
+        from host filesystem paths to container mount paths. This is essential
+        for translating persistent volume paths to accessible container paths.
+        
+        Returns:
+            dict[Path, Path]: Mapping from host paths to volume mount paths
+        """
         pod = self.get_pod()
         container = LocalStorageExporter.get_container(pod)
         mount_paths = {}
@@ -89,6 +146,15 @@ class LocalStorageExporter:
         return mount_paths
 
     def get_pvs(self) -> V1PersistentVolumeList:
+        """
+        Retrieve persistent volumes filtered by configured storage classes.
+        
+        Fetches all persistent volumes from the cluster and filters them to only
+        include those with storage classes specified in the exporter configuration.
+        
+        Returns:
+            V1PersistentVolumeList: List of persistent volumes matching the storage classes
+        """
         pvs: V1PersistentVolumeList = self.k8s_client.list_persistent_volume()
         pvs.items = [
             pv
@@ -98,6 +164,18 @@ class LocalStorageExporter:
         return pvs
 
     def get_pv_usage(self, pv: V1PersistentVolume) -> int | None:
+        """
+        Calculate the disk usage of a persistent volume in bytes.
+        
+        Determines the actual disk usage by mapping the persistent volume's path
+        to a local container path and using the 'du' command to measure usage.
+        
+        Args:
+            pv: The persistent volume to measure
+            
+        Returns:
+            int | None: Size in bytes, or None if measurement fails
+        """
         if pv.spec.local is not None:
             pv_path = Path(pv.spec.local.path)
         elif pv.spec.host_path is not None:
@@ -127,6 +205,10 @@ class LocalStorageExporter:
             return None
 
         try:
+            # Use 'du' to get the size of the directory in bytes
+            # The number and path are separated by a tab character
+            # Example output for 'du -sb /path/to/volume': 
+            # 12345678  /path/to/volume 
             result = result = subprocess.run(
                 ["du", "-sb", os.fspath(local_path)],
                 capture_output=True,
@@ -140,6 +222,21 @@ class LocalStorageExporter:
             return None
 
     def get_mount_storage_info(self, volume_mount_path: Path) -> tuple[int, int, int]:
+        """
+        Get filesystem storage information for a mounted volume path.
+        
+        Uses the 'df' command to retrieve capacity, used space, and available space
+        for the filesystem containing the specified mount path.
+        
+        Args:
+            volume_mount_path: Path to the mounted volume
+            
+        Returns:
+            tuple[int, int, int]: Capacity, used, and available space in bytes
+            
+        Raises:
+            subprocess.CalledProcessError: If the df command fails
+        """
         result = subprocess.run(
             ["df", "-B1", os.fspath(volume_mount_path)],
             capture_output=True,
@@ -148,7 +245,7 @@ class LocalStorageExporter:
         )
         lines = result.stdout.split("\n")
         # The second line contains the disk usage information
-        # Example output:
+        # Example output for 'df -B1 /volumes':
         # Filesystem     1B-blocks       Used    Available Use% Mounted on
         # /dev/root   103865303040 49565679616 54282846208  48% /volumes
         volume_mount_info = lines[1].split()
@@ -158,6 +255,13 @@ class LocalStorageExporter:
         return volume_mount_capacity, volume_mount_used, volume_mount_available
 
     def update_pv_metrics(self):
+        """
+        Update Prometheus metrics for all persistent volumes on the current node.
+        
+        Iterates through all persistent volumes matching the configured storage classes,
+        calculates their usage, and updates the corresponding Prometheus gauges with
+        usage and capacity information. Only processes volumes on the current node.
+        """
         pvs = self.get_pvs()
         pv: V1PersistentVolume
         for pv in pvs.items:
@@ -209,6 +313,13 @@ class LocalStorageExporter:
             ).set(pv_capacity)
 
     def update_mount_storage_metrics(self):
+        """
+        Update Prometheus metrics for all mounted storage volumes.
+        
+        Iterates through all discovered host path to volume mount mappings,
+        retrieves filesystem information for each mount, and updates the
+        corresponding Prometheus gauges with capacity, used, and available space.
+        """
         for host_path, volume_mount_path in self.host_path_to_volume_mount.items():
             capacity, used, available = self.get_mount_storage_info(volume_mount_path)
             metrics.mounted_disk_capacity_gauge.labels(
@@ -228,5 +339,12 @@ class LocalStorageExporter:
             ).set(available)
 
     def update_metrics(self):
+        """
+        Update all storage-related Prometheus metrics.
+        
+        Orchestrates the update of both persistent volume metrics and mounted
+        storage metrics by calling the respective update methods. This is the
+        main entry point for metric collection.
+        """
         self.update_pv_metrics()
         self.update_mount_storage_metrics()
