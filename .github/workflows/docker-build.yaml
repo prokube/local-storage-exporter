@@ -1,4 +1,4 @@
-name: Docker Image CI
+name: Docker build and push to Artifact Registry
 
 on:
   workflow_dispatch:
@@ -10,30 +10,14 @@ on:
       - ".dockerignore"
       - "pyproject.toml"
       - "uv.lock"
-      
-  pull_request:
-    branches: [ "main" ]
-    paths:
-      - "local_storage_exporter/**"
-      - "Dockerfile"
-      - ".dockerignore"
-      - "pyproject.toml"
-      - "uv.lock"
-
-env:
-  ARTIFACT_REGISTRY_PATH: ${{ secrets.GCP_ARTIFACT_REGISTRY_PATH }}
 
 jobs:
-  build:
+  build-and-push:
+    environment: google-artifact-registry
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Auth GCloud CLI
-      uses: google-github-actions/auth@v2
-      with:
-        credentials_json: ${{ secrets.GCP_SA_KEY }}
 
     - name: Docker Login to Google Artifact Registry
       uses: docker/login-action@v3
@@ -47,7 +31,7 @@ jobs:
         set -euo pipefail
 
         # Define the image name and tag
-        IMAGE_NAME="${{ env.ARTIFACT_REGISTRY_PATH }}/local-storage-exporter"
+        IMAGE_NAME="${{ vars.ARTIFACT_REGISTRY_PATH }}/local-storage-exporter"
         IMAGE_TAG=$(date +%Y%m%d%H%M%S)
         COMMIT_TAG="commit-${{ github.sha }}"
         
@@ -58,7 +42,7 @@ jobs:
         docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
         docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:$COMMIT_TAG
         
-        echo "Pushing Docker images to Artifact Registry: ${{ env.ARTIFACT_REGISTRY_PATH }}"
+        echo "Pushing Docker images to Artifact Registry: ${{ vars.ARTIFACT_REGISTRY_PATH }}"
         docker push $IMAGE_NAME:$IMAGE_TAG
         docker push $IMAGE_NAME:$COMMIT_TAG
         docker push $IMAGE_NAME:latest
