@@ -143,7 +143,7 @@
           "refId": "Mounted Disk Capacity"
         }
       ],
-      "title": "Mounted Disk Space Usage",
+      "title": "Mounted Disk Storage Usage",
       "type": "timeseries"
     },
     {
@@ -221,7 +221,7 @@
           "refId": "A"
         }
       ],
-      "title": "Mounted Disk Space Usage",
+      "title": "Mounted Disk Storage Usage",
       "type": "gauge"
     },
     {
@@ -325,7 +325,7 @@
           "refId": "PV Used Space"
         }
       ],
-      "title": "Volume Space Usage",
+      "title": "Persistent Volume Storage Usage",
       "type": "timeseries"
     },
     {
@@ -399,7 +399,7 @@
           "refId": "A"
         }
       ],
-      "title": "PV Space Usage",
+      "title": "PV Storage Usage",
       "type": "gauge"
     },
     {
@@ -545,7 +545,7 @@
           "refId": "B"
         }
       ],
-      "title": "Disk Space Usage",
+      "title": "Persistent Volume Storage Usage",
       "transformations": [
         {
           "id": "groupBy",
@@ -608,7 +608,7 @@
       "type": "table"
     }
   ],
-  "refresh": "10s",
+  "refresh": "",
   "schemaVersion": 39,
   "tags": [],
   "templating": {
@@ -636,10 +636,10 @@
         "current": {
           "selected": true,
           "text": [
-            "clean-archaeopteryx-node-01"
+            "All"
           ],
           "value": [
-            "clean-archaeopteryx-node-01"
+            "$__all"
           ]
         },
         "datasource": {
@@ -729,10 +729,10 @@
         "current": {
           "selected": true,
           "text": [
-            "data-mayastor-etcd-1"
+            "All"
           ],
           "value": [
-            "data-mayastor-etcd-1"
+            "$__all"
           ]
         },
         "datasource": {
@@ -768,6 +768,6 @@
   "timezone": "browser",
   "title": "Local Storage Exporter",
   "uid": "de7eak1lamebka",
-  "version": 3,
+  "version": 1,
   "weekStart": ""
 }

@@ -81,3 +81,10 @@ If ServiceMonitor is enabled and Prometheus Operator is running, metrics will au
 | kind             | standard          | /var/local-path-provisioner               |
 | minikube         | standard          | /tmp/hostpath-provisioner                 |
 | k3s              | standard          | /var/lib/rancher/k3s/storage/             |
+
+
+## Grafana Dashboard
+
+A grafana dashboard is included as [local-storage-expoerter-grafana.json](/local-storage-exporter-grafana.json). You can import it into your Grafana instance to visualize the metrics collected by the exporter. 
+
+<img src="/assets/grafana-dashboard.png" alt="Grafana Dashboard" width="800"/>
