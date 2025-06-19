@@ -12,7 +12,7 @@ To run it, first you need to build it as a container image. Below is the steps t
 # PROJECT=my-project
 # PLATFORM=amd64
 docker build -t $REGISTRY/$PROJECT/prokube/local-storage-exporter:$PLATFORM --platform=linux/$PLATFORM .
-docker push $REGISIRY/$PROJECT/prokube/local-storage-exporter:$PLATFORM
+docker push $REGISTRY/$PROJECT/prokube/local-storage-exporter:$PLATFORM
 ```
 
 After building the image and push it to your registry, you can deploy it using the provided helm chart after providing a values file.

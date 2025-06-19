@@ -1,0 +1,15 @@
+[project]
+name = "local-storage-exporter"
+version = "0.1.0"
+description = "Metric exporter for kubernetes storage classes that use host path"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "kubernetes==32.0.1",
+    "prometheus-client==0.21.1"
+]
+
+[dependency-groups]
+dev = [
+    "kubernetes-typed==18.20.2",
+]
