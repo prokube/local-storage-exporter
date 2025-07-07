@@ -430,11 +430,11 @@
               },
               {
                 "color": "yellow",
-                "value": 0.8
+                "value": 80
               },
               {
                 "color": "red",
-                "value": 0.9
+                "value": 90
               }
             ]
           }
