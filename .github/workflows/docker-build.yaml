@@ -13,25 +13,27 @@ on:
 
 jobs:
   build-and-push:
-    environment: google-artifact-registry
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Docker Login to Google Artifact Registry
+    - name: Log in to GitHub Container Registry
       uses: docker/login-action@v3
       with:
-        registry: europe-west3-docker.pkg.dev
-        username: _json_key
-        password: ${{ secrets.GCP_SA_KEY }}
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Build the Docker image
       run: |
         set -euo pipefail
 
         # Define the image name and tag
-        IMAGE_NAME="${{ vars.ARTIFACT_REGISTRY_PATH }}/local-storage-exporter"
+        IMAGE_NAME="ghcr.io/prokube/local-storage-exporter"
         IMAGE_TAG=$(date +%Y%m%d%H%M%S)
         COMMIT_TAG="commit-${{ github.sha }}"
         

@@ -29,6 +29,8 @@ docker build -t ${REGISTRY}/local-storage-exporter:latest --platform=linux/amd64
 docker push ${REGISTRY}/local-storage-exporter:latest
 ```
 
+Github Actions will automatically build and push the image and the helm chart to the GitHub Container Registry (GHCR) when changes are pushed to the `main` branch.
+
 ### Deploy with Helm
 
 Create a `values.yaml` file:
