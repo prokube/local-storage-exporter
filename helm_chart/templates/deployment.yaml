@@ -17,12 +17,31 @@ spec:
         app: {{ .Release.Name }}-local-storage-exporter
     spec:
       serviceAccountName: {{ .Release.Name }}-local-storage-exporter-serviceaccount
-      {{ if .Values.imagePullSecrets -}}
+      {{- if .Values.imagePullSecrets }}
       imagePullSecrets:
-      {{ range .Values.imagePullSecrets -}}
+      {{- range .Values.imagePullSecrets }}
         - name: {{ .name }}
-      {{ end -}}
-      {{ end -}}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.deployment.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.deployment.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- if .Values.deployment.tolerations }}
+      tolerations:
+        {{- toYaml .Values.deployment.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.excludeNodes }}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      {{- toYaml .Values.excludeNodes | nindent 22 }}
+      {{- end }}
       containers:
         - name: {{ .Release.Name }}-local-storage-exporter
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}

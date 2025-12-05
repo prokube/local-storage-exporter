@@ -1,31 +1,67 @@
+# -- List of storage class names to monitor (e.g., openebs-hostpath, microk8s-hostpath, standard)
 storageClassNames: []
+
+# -- List of host paths where the storage provisioner stores PV data
+# Examples: /var/openebs/local/, /var/snap/microk8s/common/default-storage
 storagePaths: []
 
+# -- Port on which the metrics server will listen
 metricsPort: 9100
+
+# -- Enable the Kubernetes Service for the exporter
 serviceEnabled: true
+
+# -- How often to refresh storage metrics
 updateInterval: 30s
 
+# -- Prometheus Operator ServiceMonitor configuration
+# Requires prometheus-operator to be installed in the cluster
 serviceMonitor:
   enabled: false
-  interval: 30s
+  interval: 30s # Scrape interval for the ServiceMonitor
   scrapeTimeout: 10s
+
+# -- Prometheus Operator PodMonitor configuration
+# Alternative to ServiceMonitor, monitors pods directly
 podMonitor:
   enabled: false
+  # -- Scrape interval for the PodMonitor
   interval: 30s
   scrapeTimeout: 10s
 
+# -- Container image configuration
 image:
+  # -- Full image name as repository/name
   repository: ghcr.io/prokube/local-storage-exporter
   tag: latest
-  pullPolicy: IfNotPresent
+  pullPolicy: IfNotPresent # Always, IfNotPresent, Never
 
+# -- Log level for the exporter (debug, info, warning, error)
 logLevel: info
 
+# -- List of image pull secrets for private registries
+# Example: [{ name: "my-registry-secret" }]
 imagePullSecrets: []
 
+# -- DaemonSet deployment mode
+# Recommended for monitoring local storage on all nodes
 daemonSet:
   enable: true
+  nodeSelector: {}
+  tolerations: []
 
+# -- Deployment mode (alternative to DaemonSet)
+# Use when you only need to monitor from a single replica
 deployment:
+  # -- Deploy as a Deployment instead of DaemonSet
   enable: false
+  # -- Number of replicas (only used if deployment is enabled)
   replicas: 1
+  nodeSelector: {}
+  tolerations: []
+
+# -- List of node names to exclude from scheduling (applies to both DaemonSet and Deployment)
+# Pods will not be scheduled on nodes matching these names
+# Uses node anti-affinity with requiredDuringSchedulingIgnoredDuringExecution
+# Example: ["node1", "node2"]
+excludeNodes: []
