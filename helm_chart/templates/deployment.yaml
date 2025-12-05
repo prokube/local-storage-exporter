@@ -25,12 +25,8 @@ spec:
       {{ end -}}
       containers:
         - name: {{ .Release.Name }}-local-storage-exporter
-          {{ if .Values.image.registry -}}
-          image: {{ .Values.image.registry }}/local-storage-exporter:{{ .Values.image.tag }}
-          {{ else -}}
-          image: local-storage-exporter:{{ .Values.image.tag }}
-          {{ end -}}
-          imagePullPolicy: {{ .Values.image.imagePullPolicy }}
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           volumeMounts:
           {{ range .Values.storagePaths -}}
           - name: "node-data-{{ include "urlsafeB64enc" . | lower }}"

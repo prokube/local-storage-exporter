@@ -15,9 +15,9 @@ podMonitor:
   scrapeTimeout: 10s
 
 image:
+  repository: ghcr.io/prokube/local-storage-exporter
   tag: latest
-  imagePullPolicy: IfNotPresent
-  registry: 
+  pullPolicy: IfNotPresent
 
 logLevel: info
 
