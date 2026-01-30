@@ -25,3 +25,11 @@
 {{- $noPadding := $urlsafe | trimSuffix "=" | trimSuffix "=" -}}
 {{- $noPadding -}}
 {{- end }}
+
+{{/* Common labels */}}
+{{- define "local-storage-exporter.labels" -}}
+app.kubernetes.io/name: local-storage-exporter
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+{{- end }}

@@ -20,6 +20,9 @@ serviceMonitor:
   enabled: false
   interval: 30s # Scrape interval for the ServiceMonitor
   scrapeTimeout: 10s
+  # -- Additional labels to add to the ServiceMonitor
+  # Useful for targeting by Prometheus Operator (e.g., release: kube-prometheus-stack)
+  labels: {}
 
 # -- Prometheus Operator PodMonitor configuration
 # Alternative to ServiceMonitor, monitors pods directly
