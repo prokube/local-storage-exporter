@@ -18,10 +18,11 @@ spec:
   containers:
     - name: wget
       image: "{{ .Values.tests.image.repository }}:{{ .Values.tests.image.tag }}"
-      command: {{ .Values.tests.command }}
+      command:
+        {{- toYaml .Values.tests.command | nindent 8 }}
       args:
         {{- range .Values.tests.args }}
-        - {{ tpl . $ }}
+        - {{ tpl . $ | quote }}
         {{- end }}
   restartPolicy: Never
 {{- end }}

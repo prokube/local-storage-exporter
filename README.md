@@ -46,7 +46,7 @@ storagePaths:
 # Container image configuration
 image:
   repository: ghcr.io/prokube/local-storage-exporter # Or your custom registry/repo
-  # tag: "1.0.0"  # Defaults to chart appVersion if empty
+  # tag: "0.1.0"  # If omitted, defaults to the chart's appVersion
   pullPolicy: IfNotPresent
 
 # Private registry authentication (optional)
