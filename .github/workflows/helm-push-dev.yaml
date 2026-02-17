@@ -41,4 +41,4 @@ jobs:
         helm package helm_chart --destination ./helm_chart/dist
 
         # Push the chart (helm push automatically uses the version from Chart.yaml)
-        helm push ./helm_chart/dist/local-storage-exporter-*.tgz oci://ghcr.io/prokube/helm
+        helm push ./helm_chart/dist/local-storage-exporter-*.tgz oci://ghcr.io/prokube/dev/helm
