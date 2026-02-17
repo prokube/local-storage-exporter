@@ -35,18 +35,18 @@ Github Actions will automatically build and push the image and the helm chart to
 
 Create a `values.yaml` file:
 ```yaml
-# Storage classes to monitor
+# (Required) Storage classes to monitor
 storageClassNames: 
   - openebs-hostpath
 
-# Host paths where PVs are stored
+# (Required) Host paths where PVs are stored
 storagePaths: 
   - /var/openebs/local/
 
 # Container image configuration
 image:
   repository: ghcr.io/prokube/local-storage-exporter # Or your custom registry/repo
-  tag: latest
+  # tag: "0.1.0"  # If omitted, defaults to the chart's appVersion
   pullPolicy: IfNotPresent
 
 # Private registry authentication (optional)
@@ -55,8 +55,13 @@ imagePullSecrets:
 
 # Metrics configuration
 metricsPort: 9100
-updateInterval: 15s
+updateInterval: 15s  # Supported suffixes: ms, s, m, h
 logLevel: info
+
+# Service configuration
+service:
+  enabled: true
+  type: ClusterIP
 
 # Prometheus Operator integration (requires prometheus-operator)
 serviceMonitor:
@@ -72,22 +77,35 @@ podMonitor:
 
 # DaemonSet mode (recommended - runs on all nodes)
 daemonSet:
-  enable: true
+  enabled: true
   nodeSelector: {}
   tolerations: []
 
 # Deployment mode (alternative to DaemonSet)
 deployment:
-  enable: false
+  enabled: false
   replicas: 1
   nodeSelector: {}
   tolerations: []
 
 # Exclude specific nodes from scheduling (by hostname)
+# Takes precedence over affinity when set
 excludeNodes: []
 # excludeNodes:
 #   - node1
 #   - node2
+
+# Custom affinity rules (only used when excludeNodes is empty)
+affinity: {}
+
+# Container resource requests and limits
+resources: {}
+#  limits:
+#    cpu: 100m
+#    memory: 128Mi
+#  requests:
+#    cpu: 100m
+#    memory: 128Mi
 ```
 
 Install the Helm chart:
@@ -102,7 +120,7 @@ helm install -n <namespace> <release-name> ./helm_chart \
 
 Port-forward to test the metrics endpoint:
 ```bash
-kubectl port-forward -n <namespace> svc/<release-name>-local-storage-exporter-service 9100:9100
+kubectl port-forward -n <namespace> svc/<release-name>-local-storage-exporter 9100:9100
 curl http://localhost:9100/metrics
 ```
 

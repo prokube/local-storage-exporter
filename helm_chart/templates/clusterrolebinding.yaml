@@ -1,12 +1,17 @@
+{{- include "validate.serviceAccountRBAC" . }}
+{{- if .Values.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ .Release.Name }}-local-storage-exporter-clusterrolebinding
+  name: {{ include "local-storage-exporter.fullname" . }}
+  labels:
+    {{- include "local-storage-exporter.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ .Release.Name }}-local-storage-exporter-clusterrole
+  name: {{ include "local-storage-exporter.fullname" . }}
 subjects:
   - kind: ServiceAccount
-    name: {{ .Release.Name }}-local-storage-exporter-serviceaccount
+    name: {{ include "local-storage-exporter.serviceAccountName" . }}
     namespace: {{ .Release.Namespace }}
+{{- end }}

@@ -1,17 +1,23 @@
-{{ if .Values.podMonitor.enabled }}
+{{- if .Values.podMonitor.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: {{ .Release.Name }}-local-storage-exporter-podmonitor
+  name: {{ include "local-storage-exporter.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "local-storage-exporter.labels" . | nindent 4 }}
+    {{- with .Values.podMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   selector:
     matchLabels:
-      app: {{ .Release.Name }}-local-storage-exporter
+      {{- include "local-storage-exporter.selectorLabels" . | nindent 6 }}
   podMetricsEndpoints:
-  - port: metrics
-    interval: {{ .Values.podMonitor.interval }}
-    scrapeTimeout: {{ .Values.podMonitor.scrapeTimeout }}
+    - port: metrics
+      interval: {{ .Values.podMonitor.interval }}
+      scrapeTimeout: {{ .Values.podMonitor.scrapeTimeout }}
   namespaceSelector:
     matchNames:
       - {{ .Release.Namespace }}
-{{ end }}
+{{- end }}

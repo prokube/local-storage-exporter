@@ -1,34 +1,47 @@
-{{ include "validate.requiredValues" . }}
-{{ $metricsPort := include "validate.metricsPort" . }}
----
-{{ if .Values.daemonSet.enable -}}
+{{- include "validate.requiredValues" . }}
+{{- include "validate.workloadMode" . }}
+{{- include "validate.serviceAccountRBAC" . }}
+{{- $metricsPort := include "validate.metricsPort" . }}
+{{- if .Values.daemonSet.enabled }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ .Release.Name }}-local-storage-exporter-daemonset
+  name: {{ include "local-storage-exporter.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "local-storage-exporter.labels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
-      app: {{ .Release.Name }}-local-storage-exporter
+      {{- include "local-storage-exporter.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       labels:
-        app: {{ .Release.Name }}-local-storage-exporter
-    spec:        
-      serviceAccountName: {{ .Release.Name }}-local-storage-exporter-serviceaccount
-      {{- if .Values.imagePullSecrets }}
+        {{- include "local-storage-exporter.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "local-storage-exporter.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
-      {{- range .Values.imagePullSecrets }}
-        - name: {{ .name }}
+        {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.daemonSet.nodeSelector }}
+      {{- with .Values.daemonSet.nodeSelector }}
       nodeSelector:
-        {{- toYaml .Values.daemonSet.nodeSelector | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.daemonSet.tolerations }}
+      {{- with .Values.daemonSet.tolerations }}
       tolerations:
-        {{- toYaml .Values.daemonSet.tolerations | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
       {{- end }}
       {{- if .Values.excludeNodes }}
       affinity:
@@ -40,34 +53,54 @@ spec:
                     operator: NotIn
                     values:
                       {{- toYaml .Values.excludeNodes | nindent 22 }}
+      {{- else if .Values.affinity }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
       {{- end }}
       containers:
-        - name: {{ .Release.Name }}-local-storage-exporter
-          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        - name: {{ .Chart.Name }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           volumeMounts:
-          {{ range .Values.storagePaths -}}
-          - name: "node-data-{{ include "urlsafeB64enc" . | lower }}"
-            mountPath: "/volumes/{{ include "urlsafeB64enc" . | lower }}" # Where it appears in container
-            readOnly: true
-          {{ end -}}
+            {{- range .Values.storagePaths }}
+            - name: "node-data-{{ include "urlsafeB64enc" . | lower }}"
+              mountPath: "/volumes/{{ include "urlsafeB64enc" . | lower }}"
+              readOnly: true
+            {{- end }}
           ports:
             - containerPort: {{ $metricsPort }}
               name: metrics
+              protocol: TCP
           env:
             - name: STORAGE_CLASS_NAMES
-              value: {{join "," .Values.storageClassNames }}
+              value: {{ join "," .Values.storageClassNames | quote }}
             - name: METRICS_PORT
               value: {{ quote $metricsPort }}
             - name: UPDATE_INTERVAL
               value: {{ quote .Values.updateInterval }}
             - name: LOGLEVEL
               value: {{ .Values.logLevel | upper | quote }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       volumes:
-      {{ range .Values.storagePaths -}}
-      - name: "node-data-{{ include "urlsafeB64enc" . | lower }}"
-        hostPath:
-          path: {{ . }}
-          type: Directory # Ensures directory exists
-      {{ end -}}
-{{ end -}}
+        {{- range .Values.storagePaths }}
+        - name: "node-data-{{ include "urlsafeB64enc" . | lower }}"
+          hostPath:
+            path: {{ . | quote }}
+            type: Directory
+        {{- end }}
+{{- end }}

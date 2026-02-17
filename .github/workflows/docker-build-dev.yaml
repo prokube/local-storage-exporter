@@ -36,7 +36,7 @@ jobs:
           SAFE_REF_NAME=$(echo '${{ github.ref_name }}' | sed 's/[^a-zA-Z0-9._-]/-/g' | tr '[:upper:]' '[:lower:]')
           
           # Define the image name and tag
-          IMAGE_NAME="ghcr.io/prokube/local-storage-exporter"
+          IMAGE_NAME="ghcr.io/prokube/dev/local-storage-exporter"
           IMAGE_TAG="dev-$SAFE_REF_NAME"
           COMMIT_TAG="dev-commit-${{ github.sha }}"
 

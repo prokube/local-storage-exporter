@@ -1,8 +1,10 @@
-{{ if .Values.serviceMonitor.enabled }}
+{{- include "validate.monitorDependencies" . }}
+{{- if and .Values.serviceMonitor.enabled .Values.service.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ .Release.Name }}-local-storage-exporter-servicemonitor
+  name: {{ include "local-storage-exporter.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "local-storage-exporter.labels" . | nindent 4 }}
     {{- with .Values.serviceMonitor.labels }}
@@ -11,12 +13,12 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: {{ .Release.Name }}-local-storage-exporter
+      {{- include "local-storage-exporter.selectorLabels" . | nindent 6 }}
   endpoints:
-  - port: metrics
-    interval: {{ .Values.serviceMonitor.interval }}
-    scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
+    - port: metrics
+      interval: {{ .Values.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout }}
   namespaceSelector:
     matchNames:
       - {{ .Release.Namespace }}
-{{ end }}
+{{- end }}

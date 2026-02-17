@@ -1,8 +1,13 @@
+{{- include "validate.serviceAccountRBAC" . }}
+{{- if .Values.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ .Release.Name }}-local-storage-exporter-clusterrole
+  name: {{ include "local-storage-exporter.fullname" . }}
+  labels:
+    {{- include "local-storage-exporter.labels" . | nindent 4 }}
 rules:
   - apiGroups: [""]
     resources: ["persistentvolumes", "pods"]
     verbs: ["list"]
+{{- end }}

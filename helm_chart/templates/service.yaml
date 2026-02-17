@@ -1,18 +1,19 @@
-{{ $metricsPort := include "validate.metricsPort" . }}
----
-{{- if .Values.serviceEnabled -}}
+{{- $metricsPort := include "validate.metricsPort" . }}
+{{- if .Values.service.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-local-storage-exporter-service
+  name: {{ include "local-storage-exporter.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ .Release.Name }}-local-storage-exporter
+    {{- include "local-storage-exporter.labels" . | nindent 4 }}
 spec:
+  type: {{ .Values.service.type }}
   selector:
-    app: {{ .Release.Name }}-local-storage-exporter
+    {{- include "local-storage-exporter.selectorLabels" . | nindent 4 }}
   ports:
     - protocol: TCP
       name: metrics
       port: {{ $metricsPort }}
       targetPort: metrics
-{{- end -}}
+{{- end }}

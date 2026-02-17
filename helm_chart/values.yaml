@@ -1,24 +1,94 @@
-# -- List of storage class names to monitor (e.g., openebs-hostpath, microk8s-hostpath, standard)
+# -- (Required) List of storage class names to monitor
+# The chart will fail to render if this is empty.
+# Example: ["openebs-hostpath", "microk8s-hostpath", "standard"]
 storageClassNames: []
 
-# -- List of host paths where the storage provisioner stores PV data
-# Examples: /var/openebs/local/, /var/snap/microk8s/common/default-storage
+# -- (Required) List of host paths where the storage provisioner stores PV data
+# The chart will fail to render if this is empty.
+# Example: ["/var/openebs/local/", "/var/snap/microk8s/common/default-storage"]
 storagePaths: []
 
-# -- Port on which the metrics server will listen
+# -- Port on which the metrics server will listen (1-65535)
 metricsPort: 9100
 
-# -- Enable the Kubernetes Service for the exporter
-serviceEnabled: true
-
 # -- How often to refresh storage metrics
+# Supported suffixes: ms, s, m, h. No suffix defaults to seconds.
+# Examples: 30s, 1m, 500ms, 2h, 30
 updateInterval: 30s
+
+# -- Container image configuration
+image:
+  # -- Image repository
+  repository: ghcr.io/prokube/local-storage-exporter
+  # -- Image pull policy (Always, IfNotPresent, Never)
+  pullPolicy: IfNotPresent
+  # -- Overrides the image tag whose default is the chart appVersion
+  tag: ""
+
+# -- List of image pull secrets for private registries
+# Example:
+#   - name: my-registry-secret
+imagePullSecrets: []
+
+# -- Override the chart name used in resource names and labels
+nameOverride: ""
+# -- Override the full resource name (release-name + chart-name) for all resources
+fullnameOverride: ""
+
+# -- Service account configuration
+serviceAccount:
+  # -- Specifies whether a service account should be created
+  create: true
+  # -- Automatically mount a ServiceAccount's API credentials
+  automount: true
+  # -- Annotations to add to the service account
+  annotations: {}
+  # -- The name of the service account to use
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# -- RBAC configuration
+rbac:
+  # -- Specifies whether ClusterRole and ClusterRoleBinding should be created
+  create: true
+
+# -- Annotations to add to pods
+podAnnotations: {}
+# -- Labels to add to pods
+podLabels: {}
+
+# -- Pod-level security context
+podSecurityContext: {}
+  # fsGroup: 2000
+
+# -- Container-level security context
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+# -- Service configuration
+service:
+  # -- Enable the Kubernetes Service for the exporter
+  enabled: true
+  # -- Service type (ClusterIP, NodePort, LoadBalancer)
+  type: ClusterIP
+
+# -- Log level for the exporter (debug, info, warning, error)
+logLevel: info
 
 # -- Prometheus Operator ServiceMonitor configuration
 # Requires prometheus-operator to be installed in the cluster
+# NOTE: ServiceMonitor requires service.enabled to be true
 serviceMonitor:
+  # -- Enable the ServiceMonitor resource
   enabled: false
-  interval: 30s # Scrape interval for the ServiceMonitor
+  # -- Scrape interval
+  interval: 30s
+  # -- Scrape timeout
   scrapeTimeout: 10s
   # -- Additional labels to add to the ServiceMonitor
   # Useful for targeting by Prometheus Operator (e.g., release: kube-prometheus-stack)
@@ -27,44 +97,103 @@ serviceMonitor:
 # -- Prometheus Operator PodMonitor configuration
 # Alternative to ServiceMonitor, monitors pods directly
 podMonitor:
+  # -- Enable the PodMonitor resource
   enabled: false
-  # -- Scrape interval for the PodMonitor
+  # -- Scrape interval
   interval: 30s
+  # -- Scrape timeout
   scrapeTimeout: 10s
-
-# -- Container image configuration
-image:
-  # -- Full image name as repository/name
-  repository: ghcr.io/prokube/local-storage-exporter
-  tag: latest
-  pullPolicy: IfNotPresent # Always, IfNotPresent, Never
-
-# -- Log level for the exporter (debug, info, warning, error)
-logLevel: info
-
-# -- List of image pull secrets for private registries
-# Example: [{ name: "my-registry-secret" }]
-imagePullSecrets: []
+  # -- Additional labels to add to the PodMonitor
+  # Useful for targeting by Prometheus Operator (e.g., release: kube-prometheus-stack)
+  labels: {}
 
 # -- DaemonSet deployment mode
 # Recommended for monitoring local storage on all nodes
 daemonSet:
-  enable: true
+  # -- Deploy as a DaemonSet
+  enabled: true
+  # -- Node selector for DaemonSet pods
   nodeSelector: {}
+  # -- Tolerations for DaemonSet pods
   tolerations: []
 
 # -- Deployment mode (alternative to DaemonSet)
 # Use when you only need to monitor from a single replica
 deployment:
   # -- Deploy as a Deployment instead of DaemonSet
-  enable: false
+  enabled: false
   # -- Number of replicas (only used if deployment is enabled)
   replicas: 1
+  # -- Node selector for Deployment pods
   nodeSelector: {}
+  # -- Tolerations for Deployment pods
   tolerations: []
 
-# -- List of node names to exclude from scheduling (applies to both DaemonSet and Deployment)
-# Pods will not be scheduled on nodes matching these names
-# Uses node anti-affinity with requiredDuringSchedulingIgnoredDuringExecution
+# -- Convenience shortcut to exclude specific nodes by hostname
+# Pods will not be scheduled on nodes matching these names.
+# Uses nodeAffinity with requiredDuringSchedulingIgnoredDuringExecution.
+# Takes precedence over the affinity value below — if you need both excludeNodes
+# and custom affinity rules, express everything in the affinity value instead.
 # Example: ["node1", "node2"]
 excludeNodes: []
+
+# -- Custom affinity rules (advanced)
+# Only used when excludeNodes is empty; excludeNodes takes precedence when set.
+# To combine node exclusion with other affinity rules, express everything here:
+# Example (excludeNodes + zone affinity combined):
+#   nodeAffinity:
+#     requiredDuringSchedulingIgnoredDuringExecution:
+#       nodeSelectorTerms:
+#         - matchExpressions:
+#             - key: kubernetes.io/hostname
+#               operator: NotIn
+#               values:
+#                 - node1
+#                 - node2
+#             - key: topology.kubernetes.io/zone
+#               operator: In
+#               values:
+#                 - us-east-1a
+affinity: {}
+
+# -- Container resource requests and limits
+resources: {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+# -- Liveness probe configuration
+livenessProbe:
+  httpGet:
+    path: /metrics
+    port: metrics
+  initialDelaySeconds: 3
+  periodSeconds: 15
+
+# -- Readiness probe configuration
+readinessProbe:
+  httpGet:
+    path: /metrics
+    port: metrics
+  initialDelaySeconds: 3
+  periodSeconds: 15
+
+# -- Helm test configuration
+tests:
+  # -- Container image for test pod
+  image:
+    repository: busybox
+    tag: "1.37"
+  # -- Command to run in test container
+  command: ['wget']
+  # -- Arguments for the test command, supports templating with access to all values
+  args: ['--spider', 'http://{{ include "local-storage-exporter.fullname" . }}:{{ include "validate.metricsPort" . }}/metrics']
+  # -- Additional labels to add to test pods
+  labels: {}
+  # -- Additional annotations to add to test pods
+  # Example for disabling Istio sidecar injection:
+  #   sidecar.istio.io/inject: "false"
+  annotations: {}
