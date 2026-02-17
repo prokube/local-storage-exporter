@@ -180,3 +180,20 @@ readinessProbe:
     port: metrics
   initialDelaySeconds: 3
   periodSeconds: 15
+
+# -- Helm test configuration
+tests:
+  # -- Container image for test pod
+  image:
+    repository: busybox
+    tag: "1.37"
+  # -- Command to run in test container
+  command: ['wget']
+  # -- Arguments for the test command, supports templating with access to all values
+  args: ['--spider', 'http://{{ include "local-storage-exporter.fullname" . }}:{{ include "validate.metricsPort" . }}/metrics']
+  # -- Additional labels to add to test pods
+  labels: {}
+  # -- Additional annotations to add to test pods
+  # Example for disabling Istio sidecar injection:
+  #   sidecar.istio.io/inject: "false"
+  annotations: {}

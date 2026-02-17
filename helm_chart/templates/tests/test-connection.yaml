@@ -6,13 +6,22 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "local-storage-exporter.labels" . | nindent 4 }}
+    {{- with .Values.tests.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
   annotations:
     "helm.sh/hook": test
+    {{- with .Values.tests.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
   containers:
     - name: wget
-      image: busybox:1.37
-      command: ['wget']
-      args: ['--spider', 'http://{{ include "local-storage-exporter.fullname" . }}:{{ include "validate.metricsPort" . }}/metrics']
+      image: "{{ .Values.tests.image.repository }}:{{ .Values.tests.image.tag }}"
+      command: {{ .Values.tests.command }}
+      args:
+        {{- range .Values.tests.args }}
+        - {{ tpl . $ }}
+        {{- end }}
   restartPolicy: Never
 {{- end }}
