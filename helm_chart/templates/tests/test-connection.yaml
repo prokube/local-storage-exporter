@@ -12,6 +12,6 @@ spec:
     - name: wget
       image: busybox:1.37
       command: ['wget']
-      args: ['{{ include "local-storage-exporter.fullname" . }}:{{ include "validate.metricsPort" . }}']
+      args: ['--spider', 'http://{{ include "local-storage-exporter.fullname" . }}:{{ include "validate.metricsPort" . }}/metrics']
   restartPolicy: Never
 {{- end }}

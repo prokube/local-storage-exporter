@@ -1,5 +1,6 @@
 {{- include "validate.requiredValues" . }}
 {{- include "validate.workloadMode" . }}
+{{- include "validate.serviceAccountRBAC" . }}
 {{- $metricsPort := include "validate.metricsPort" . }}
 {{- if .Values.daemonSet.enabled }}
 apiVersion: apps/v1

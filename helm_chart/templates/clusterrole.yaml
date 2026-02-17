@@ -1,4 +1,5 @@
-{{- if .Values.rbac.create }}
+{{- include "validate.serviceAccountRBAC" . }}
+{{- if and .Values.rbac.create (or .Values.serviceAccount.create (not (empty .Values.serviceAccount.name))) }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:

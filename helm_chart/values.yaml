@@ -168,7 +168,7 @@ resources: {}
 # -- Liveness probe configuration
 livenessProbe:
   httpGet:
-    path: /
+    path: /metrics
     port: metrics
   initialDelaySeconds: 3
   periodSeconds: 15
@@ -176,7 +176,7 @@ livenessProbe:
 # -- Readiness probe configuration
 readinessProbe:
   httpGet:
-    path: /
+    path: /metrics
     port: metrics
   initialDelaySeconds: 3
   periodSeconds: 15

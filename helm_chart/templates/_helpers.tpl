@@ -90,10 +90,17 @@ Create the name of the service account to use
 {{- $metricsPort -}}
 {{- end -}}
 
-{{/* Validate that ServiceMonitor/PodMonitor dependencies are met. */}}
+{{/* Validate that ServiceMonitor dependencies are met. */}}
 {{- define "validate.monitorDependencies" -}}
 {{- if and .Values.serviceMonitor.enabled (not .Values.service.enabled) -}}
 {{ fail "serviceMonitor.enabled requires service.enabled to be true. ServiceMonitor needs a Service resource to scrape from." }}
+{{- end -}}
+{{- end -}}
+
+{{/* Validate ServiceAccount + RBAC configuration to prevent security issues. */}}
+{{- define "validate.serviceAccountRBAC" -}}
+{{- if and .Values.rbac.create (not .Values.serviceAccount.create) (empty .Values.serviceAccount.name) -}}
+{{ fail "When rbac.create=true and serviceAccount.create=false, you must explicitly set serviceAccount.name. Otherwise RBAC will bind to the 'default' ServiceAccount, granting permissions to all pods in the namespace." }}
 {{- end -}}
 {{- end -}}
 

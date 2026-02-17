@@ -11,10 +11,11 @@
 {{- if .Values.service.enabled }}
   export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace | squote }} -l "app.kubernetes.io/name={{ include "local-storage-exporter.name" . | squote }},app.kubernetes.io/instance={{ .Release.Name | squote }}" -o jsonpath="{.items[0].metadata.name}")
   export CONTAINER_PORT=$(kubectl get pod --namespace {{ .Release.Namespace | squote }} $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
-  echo "Visit http://127.0.0.1:{{ include "validate.metricsPort" . }} to access metrics"
+  echo "Visit http://127.0.0.1:{{ include "validate.metricsPort" . }}/metrics to access metrics"
   kubectl --namespace {{ .Release.Namespace | squote }} port-forward $POD_NAME {{ include "validate.metricsPort" . }}:$CONTAINER_PORT
 {{- else }}
   NOTE: No Service was created. You can access the metrics by port-forwarding directly to a pod:
   export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace | squote }} -l "app.kubernetes.io/name={{ include "local-storage-exporter.name" . | squote }},app.kubernetes.io/instance={{ .Release.Name | squote }}" -o jsonpath="{.items[0].metadata.name}")
   kubectl --namespace {{ .Release.Namespace | squote }} port-forward $POD_NAME {{ include "validate.metricsPort" . }}:{{ include "validate.metricsPort" . }}
+  echo "Visit http://127.0.0.1:{{ include "validate.metricsPort" . }}/metrics to access metrics"
 {{- end }}
