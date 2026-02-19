@@ -1,0 +1,53 @@
+name: Docker build and push main to ghcr.io
+
+on:
+  push:
+    tags: [ "v*" ]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure tag is on main
+        run: |
+          git fetch origin main
+          if ! git merge-base --is-ancestor ${{ github.sha }} origin/main; then
+            echo "Tag is not on main branch"
+            exit 1
+          fi
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build the Docker image
+        run: |
+          set -euo pipefail
+
+          # Define the image name and tag
+          IMAGE_NAME="ghcr.io/prokube/local-storage-exporter"
+          LATEST_TAG="latest"
+          COMMIT_TAG="commit-${{ github.sha }}"
+          VERSION_TAG="${{ github.ref_name }}"
+          VERSION_TAG="${VERSION_TAG#v}" # Remove the leading 'v' from the version tag if it exists
+
+          echo "Building Docker image: $IMAGE_NAME:$VERSION_TAG"
+          docker build . -f Dockerfile -t $IMAGE_NAME:$VERSION_TAG
+          docker tag $IMAGE_NAME:$VERSION_TAG $IMAGE_NAME:$COMMIT_TAG
+          docker tag $IMAGE_NAME:$VERSION_TAG $IMAGE_NAME:$LATEST_TAG
+
+          echo "Pushing built image"
+          docker push $IMAGE_NAME:$VERSION_TAG
+          docker push $IMAGE_NAME:$COMMIT_TAG
+          docker push $IMAGE_NAME:$LATEST_TAG
