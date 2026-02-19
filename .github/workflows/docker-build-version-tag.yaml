@@ -60,7 +60,7 @@ jobs:
             latest=false
           tags: |
             type=semver,pattern={{version}}
-            type=raw,value=commit-{{sha}}
+            type=raw,value=commit-${{ github.sha }}
             type=raw,value=latest,enable=${{ steps.check.outputs.is_latest }}
 
       - name: Build and push Docker image

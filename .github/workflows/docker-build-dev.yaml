@@ -37,8 +37,9 @@ jobs:
         with:
           images: ghcr.io/prokube/dev/local-storage-exporter
           tags: |
-            type=raw,value=dev-{{branch}}
-            type=raw,value=dev-commit-{{sha}}
+            type=raw,value=dev-{{branch}},enable=true
+            type=raw,value=dev-commit-${{ github.sha }}
+          sanitize: true
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
