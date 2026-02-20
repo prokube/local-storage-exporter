@@ -58,6 +58,19 @@ metricsPort: 9100
 updateInterval: 15s  # Supported suffixes: ms, s, m, h
 logLevel: info
 
+# PVC label promotion (optional)
+# List of PVC label keys to expose as individual Prometheus metric labels.
+# Characters invalid in Prometheus label names (e.g. dots, slashes) are replaced with underscores.
+# Example: a PVC label "app.kubernetes.io/name" becomes the metric label "app_kubernetes_io_name".
+pvcLabels:
+  promote: []
+  # promote:
+  #   - custom_label1
+  #   - custom_label2
+  # Also expose all remaining PVC labels (those not in the promote list) as a JSON blob
+  # in a single "pvc_labels" metric label. Defaults to false.
+  includeRemainingAsBlob: false
+
 # Service configuration
 service:
   enabled: true

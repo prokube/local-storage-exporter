@@ -80,6 +80,19 @@ service:
 # -- Log level for the exporter (debug, info, warning, error)
 logLevel: info
 
+# -- PVC label promotion configuration
+pvcLabels:
+  # -- List of PVC label keys to promote as individual metric labels alongside the existing ones.
+  # Each key appears directly as a Prometheus label (invalid characters are replaced with _).
+  # Example:
+  #   promote:
+  #     - custom_label1
+  #     - custom_label2
+  promote: []
+  # -- Also expose remaining PVC labels (those not in the promote list) as a JSON blob
+  # in a pvc_labels metric label.
+  includeRemainingAsBlob: false
+
 # -- Prometheus Operator ServiceMonitor configuration
 # Requires prometheus-operator to be installed in the cluster
 # NOTE: ServiceMonitor requires service.enabled to be true

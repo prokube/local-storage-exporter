@@ -10,4 +10,7 @@ rules:
   - apiGroups: [""]
     resources: ["persistentvolumes", "pods"]
     verbs: ["list"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list"]
 {{- end }}

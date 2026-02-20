@@ -37,7 +37,15 @@ def main():
         _logger.info(f"Metrics port: {port}")
         _logger.info(f"Update interval: {update_interval} seconds")
 
-        lse = LocalStorageExporter(storage_class_names=storage_class_names)
+        pvc_label_keys_raw = os.environ.get("PVC_LABEL_KEYS", "")
+        pvc_label_keys = [k.strip() for k in pvc_label_keys_raw.split(",") if k.strip()]
+        include_pvc_labels_blob = os.environ.get("PVC_LABELS_BLOB", "false").lower() == "true"
+
+        lse = LocalStorageExporter(
+            storage_class_names=storage_class_names,
+            pvc_label_keys=pvc_label_keys,
+            include_pvc_labels_blob=include_pvc_labels_blob,
+        )
         start_http_server(port)  # Metrics exporter server
         _logger.info(f"Started local storage exporter on port {port}")
         while True:
