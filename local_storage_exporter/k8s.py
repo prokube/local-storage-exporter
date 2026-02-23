@@ -1,5 +1,7 @@
 from __future__ import annotations
+import json
 import logging
+import re
 import subprocess
 import os
 from pathlib import Path
@@ -15,6 +17,21 @@ from . import utils, metrics
 
 _logger = utils.createLogger(__name__)
 
+
+def _sanitize_label_key(key: str) -> str:
+    """Sanitize a string to be a valid Prometheus label name."""
+    # Replace any character not allowed in Prometheus label names with underscore
+    sanitized = re.sub(r"[^a-zA-Z0-9_]", "_", key)
+
+    # If everything was stripped out, fall back to a safe default
+    if not sanitized:
+        return "_"
+
+    # Prometheus label names must start with [a-zA-Z_]; prepend underscore if they don't
+    if not re.match(r"[a-zA-Z_]", sanitized[0]):
+        sanitized = "_" + sanitized
+
+    return sanitized
 class LocalStorageExporter:
     """
     A Kubernetes local storage exporter that monitors persistent volumes and mounted storage.
@@ -30,16 +47,20 @@ class LocalStorageExporter:
     def __init__(
         self,
         storage_class_names: list[str],
+        pvc_label_keys: list[str],
+        include_pvc_labels_blob: bool = False,
     ):
         """
         Initialize the LocalStorageExporter with specified storage classes.
-        
+
         Sets up Kubernetes client configuration, discovers host path to volume mount mappings,
         and identifies the current node name where the exporter is running.
-        
+
         Args:
             storage_class_names: List of storage class names to monitor
-            
+            pvc_label_keys: PVC label keys to promote as individual metric labels
+            include_pvc_labels_blob: Whether to expose remaining PVC labels as a JSON blob
+
         Raises:
             config.ConfigException: If Kubernetes configuration cannot be loaded
             RuntimeError: If no hostPath mounted volumes are found
@@ -59,6 +80,52 @@ class LocalStorageExporter:
 
         self.node_name = self.get_pod().spec.node_name
         self.storage_class_names = storage_class_names
+        self.pvc_label_keys = pvc_label_keys
+        self.include_pvc_labels_blob = include_pvc_labels_blob
+
+        # Base label names used by the PV gauges; extra PVC labels must not collide with these.
+        base_labelnames = {
+            "node_name",
+            "pvc_name",
+            "pvc_namespace",
+            "pv_name",
+            "storage_path",
+            "pv_capacity",
+            "storage_class_name",
+            "pvc_labels",
+        }
+
+        # Sanitize PVC label keys once and validate for collisions.
+        sanitized_labelnames = [_sanitize_label_key(k) for k in self.pvc_label_keys]
+
+        # Check for collisions with base label names.
+        colliding_with_base = sorted(
+            {name for name in sanitized_labelnames if name in base_labelnames}
+        )
+        if colliding_with_base:
+            raise ValueError(
+                "Promoted PVC label keys collide with base label names after "
+                f"sanitization: {', '.join(colliding_with_base)}"
+            )
+
+        # Check for duplicate sanitized PVC label names.
+        seen = set()
+        duplicates = set()
+        for name in sanitized_labelnames:
+            if name in seen:
+                duplicates.add(name)
+            else:
+                seen.add(name)
+        if duplicates:
+            raise ValueError(
+                "Promoted PVC label keys result in duplicate label names after "
+                f"sanitization: {', '.join(sorted(duplicates))}"
+            )
+
+        self.pv_used_bytes_gauge, self.pv_capacity_bytes_gauge = metrics.create_pv_gauges(
+            extra_labelnames=sanitized_labelnames,
+            include_pvc_labels_blob=include_pvc_labels_blob,
+        )
 
     def get_pod(self) -> V1Pod:
         """
@@ -95,7 +162,6 @@ class LocalStorageExporter:
     def get_container(pod: V1Pod) -> client.V1Container:
         """
         Get the container from the pod that is running the local storage exporter using a name identifier.
-        
         Searches through the pod's containers to find the one with the exporter identifier
         in its name. The identifier can be customized via the EXPORTER_CONTAINER_NAME_IDENTIFIER
         environment variable.
@@ -257,7 +323,7 @@ class LocalStorageExporter:
     def update_pv_metrics(self):
         """
         Update Prometheus metrics for all persistent volumes on the current node.
-        
+
         Iterates through all persistent volumes matching the configured storage classes,
         calculates their usage, and updates the corresponding Prometheus gauges with
         usage and capacity information. Only processes volumes on the current node.
@@ -282,7 +348,20 @@ class LocalStorageExporter:
                 pv.spec.capacity["storage"]
             )
             storage_class_name = pv.spec.storage_class_name
-            pv_used_bytes_gauge = metrics.pv_used_bytes_gauge.labels(
+            try:
+                pvc = self.k8s_client.read_namespaced_persistent_volume_claim(
+                    name=pvc_name, namespace=pvc_namespace
+                )
+                raw_labels = pvc.metadata.labels or {}
+            except Exception as e:
+                _logger.error(f"Failed to fetch PVC {pvc_namespace}/{pvc_name}: {e}")
+                raw_labels = {}
+            label_kwargs = {_sanitize_label_key(k): raw_labels.get(k, "") for k in self.pvc_label_keys}
+            if self.include_pvc_labels_blob:
+                promoted = set(self.pvc_label_keys)
+                remaining = {k: v for k, v in raw_labels.items() if k not in promoted}
+                label_kwargs["pvc_labels"] = json.dumps(remaining, sort_keys=True)
+            pv_used_bytes_gauge = self.pv_used_bytes_gauge.labels(
                 node_name=self.node_name,
                 pvc_name=pvc_name,
                 pvc_namespace=pvc_namespace,
@@ -290,6 +369,7 @@ class LocalStorageExporter:
                 storage_path=storage_path,
                 pv_capacity=pv_capacity,
                 storage_class_name=storage_class_name,
+                **label_kwargs,
             )
             if usage is not None:
                 pv_used_bytes_gauge.set(usage)
@@ -302,7 +382,7 @@ class LocalStorageExporter:
             # This is a constant value, so we don't need to update it every time
             # However this is a simple way to ensure that the metric is always updated when there was a change instead of tracking creation/deletion events
             # If we can just extract this information from the used_bytes_gauge label using promql (or different method), we can remove this gauge.
-            metrics.pv_capacity_bytes_gauge.labels(
+            self.pv_capacity_bytes_gauge.labels(
                 node_name=self.node_name,
                 pvc_name=pvc_name,
                 pvc_namespace=pvc_namespace,
@@ -310,6 +390,7 @@ class LocalStorageExporter:
                 storage_path=storage_path,
                 pv_capacity=pv_capacity,
                 storage_class_name=storage_class_name,
+                **label_kwargs,
             ).set(pv_capacity)
 
     def update_mount_storage_metrics(self):

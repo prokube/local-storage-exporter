@@ -84,6 +84,10 @@ spec:
               value: {{ quote .Values.updateInterval }}
             - name: LOGLEVEL
               value: {{ .Values.logLevel | upper | quote }}
+            - name: PVC_LABEL_KEYS
+              value: {{ join "," .Values.pvcLabels.promote | quote }}
+            - name: PVC_LABELS_BLOB
+              value: {{ .Values.pvcLabels.includeRemainingAsBlob | quote }}
           {{- with .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
