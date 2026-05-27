@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:0.9.15-python3.14-trixie-slim@sha256:fcc24916ddd11826f45a1f5d50db5222eb1e358af2d9b28936298d8d37854c0e AS builder
+FROM ghcr.io/astral-sh/uv:0.11.16-python3.14-trixie-slim@sha256:14fbf3734501e0d9179b68c952445c03fe46787ed8d6a5bb3143dcf59fef2093 AS builder
 
 COPY . /app
 WORKDIR /app
@@ -8,7 +8,7 @@ ENV UV_PYTHON_INSTALL_DIR=/python
 RUN uv python install 3.14
 RUN uv sync --locked --no-dev # It will create a virtual environment in /app/.venv
 
-FROM debian:trixie-slim@sha256:18764e98673c3baf1a6f8d960b5b5a1ec69092049522abac4e24a7726425b016
+FROM debian:trixie-slim@sha256:b6e2a152f22a40ff69d92cb397223c906017e1391a73c952b588e51af8883bf8
 
 COPY --from=builder /python /python
 COPY --from=builder /app /app
