@@ -29,7 +29,7 @@ docker build -t ${REGISTRY}/local-storage-exporter:latest --platform=linux/amd64
 docker push ${REGISTRY}/local-storage-exporter:latest
 ```
 
-GitHub Actions publishes development images and charts from `main` or manual runs to `europe-west3-docker.pkg.dev/prokube/development`. Exact `vX.Y.Z` image tags and `helm-vX.Y.Z` chart tags publish immutable release artifacts to `europe-west3-docker.pkg.dev/prokube/releases`; rerunning an already published release preserves the existing artifact.
+GitHub Actions publishes the public image to `ghcr.io/prokube/local-storage-exporter` and public Helm charts to `ghcr.io/prokube/helm/local-storage-exporter`. Separate Google Artifact Registry workflows publish main/manual development charts to `europe-west3-docker.pkg.dev/prokube/development/helm` and exact `helm-vX.Y.Z` release charts to the immutable `europe-west3-docker.pkg.dev/prokube/releases/helm` repository. Rerunning an already published GAR release preserves the existing artifact.
 
 ### Deploy with Helm
 

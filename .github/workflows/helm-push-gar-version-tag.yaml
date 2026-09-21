@@ -1,0 +1,82 @@
+name: Helm package release chart to GAR
+
+on:
+  push:
+    tags: ["helm-v*"]
+
+jobs:
+  package-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate release tag
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$REF_NAME" =~ ^helm-v[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?$ ]]; then
+            echo "Release tag must match helm-vX.Y.Z or helm-vX.Y.Z-rcN"
+            exit 1
+          fi
+
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$COMMIT_SHA" origin/main; then
+            echo "Tag is not on main branch"
+            exit 1
+          fi
+
+          CHART_VERSION=$(awk '/^version:/ {print $2}' helm_chart/Chart.yaml)
+          if [[ "helm-v${CHART_VERSION}" != "$REF_NAME" ]]; then
+            echo "Chart version $CHART_VERSION does not match release tag $REF_NAME"
+            exit 1
+          fi
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Check immutable release chart
+        id: release-chart
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          CHART_VERSION="${REF_NAME#helm-v}"
+          CHART="europe-west3-docker.pkg.dev/prokube/releases/helm/local-storage-exporter:${CHART_VERSION}"
+          if output=$(gcloud artifacts docker images describe "$CHART" 2>&1); then
+            echo "$CHART already exists; preserving the immutable release artifact"
+            echo "should_push=false" >> "$GITHUB_OUTPUT"
+          elif [[ "$output" == *"NOT_FOUND"* || "$output" == *"Image not found"* ]]; then
+            echo "should_push=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "$output" >&2
+            exit 1
+          fi
+
+      - name: Log in to Google Artifact Registry
+        if: steps.release-chart.outputs.should_push == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: europe-west3-docker.pkg.dev
+          username: _json_key
+          password: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Package and push release chart
+        if: steps.release-chart.outputs.should_push == 'true'
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          CHART_VERSION="${REF_NAME#helm-v}"
+          helm package helm_chart --destination ./helm_chart/dist
+          helm push \
+            "./helm_chart/dist/local-storage-exporter-${CHART_VERSION}.tgz" \
+            oci://europe-west3-docker.pkg.dev/prokube/releases/helm
