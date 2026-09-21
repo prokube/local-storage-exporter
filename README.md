@@ -29,7 +29,7 @@ docker build -t ${REGISTRY}/local-storage-exporter:latest --platform=linux/amd64
 docker push ${REGISTRY}/local-storage-exporter:latest
 ```
 
-Github Actions will automatically build and push the image and the helm chart to the GitHub Container Registry (GHCR) when changes are pushed to the `main` branch.
+GitHub Actions publishes development images and charts from `main` or manual runs to `europe-west3-docker.pkg.dev/prokube/development`. Exact `vX.Y.Z` image tags and `helm-vX.Y.Z` chart tags publish immutable release artifacts to `europe-west3-docker.pkg.dev/prokube/releases`; rerunning an already published release preserves the existing artifact.
 
 ### Deploy with Helm
 
@@ -45,8 +45,8 @@ storagePaths:
 
 # Container image configuration
 image:
-  repository: ghcr.io/prokube/local-storage-exporter # Or your custom registry/repo
-  # tag: "0.1.0"  # If omitted, defaults to the chart's appVersion
+  repository: europe-west3-docker.pkg.dev/prokube/releases/local-storage-exporter # Or your custom registry/repo
+  # tag: "v0.2.2"  # If omitted, defaults to the chart's appVersion
   pullPolicy: IfNotPresent
 
 # Private registry authentication (optional)

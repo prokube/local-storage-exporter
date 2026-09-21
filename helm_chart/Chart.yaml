@@ -2,8 +2,8 @@ apiVersion: v2
 name: local-storage-exporter
 description: Prometheus exporter for local storage metrics on Kubernetes nodes
 type: application
-version: 0.7.0
-appVersion: "0.2.2"
+version: 0.8.0
+appVersion: "v0.2.2"
 home: https://github.com/prokube/local-storage-exporter
 sources:
   - https://github.com/prokube/local-storage-exporter

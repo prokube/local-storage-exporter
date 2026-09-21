@@ -1,43 +1,83 @@
-name: Helm package version tag and push to ghcr.io
+name: Helm package and push release chart
 
 on:
   push:
-   tags: [ "helm-v*" ]
+    tags: ["helm-v*"]
 
 jobs:
   package-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
       with:
         fetch-depth: 0
 
-    - name: Ensure tag is on main
+    - name: Validate release tag
+      env:
+        REF_NAME: ${{ github.ref_name }}
+        COMMIT_SHA: ${{ github.sha }}
       run: |
+        set -euo pipefail
+        if [[ ! "$REF_NAME" =~ ^helm-v[0-9]+\.[0-9]+\.[0-9]+(-rc[0-9]+)?$ ]]; then
+          echo "Release tag must match helm-vX.Y.Z or helm-vX.Y.Z-rcN"
+          exit 1
+        fi
+
         git fetch origin main
-        if ! git merge-base --is-ancestor ${{ github.sha }} origin/main; then
+        if ! git merge-base --is-ancestor "$COMMIT_SHA" origin/main; then
           echo "Tag is not on main branch"
           exit 1
         fi
 
-    - name: Log in to GitHub Container Registry
+        CHART_VERSION=$(awk '/^version:/ {print $2}' helm_chart/Chart.yaml)
+        if [[ "helm-v${CHART_VERSION}" != "$REF_NAME" ]]; then
+          echo "Chart version $CHART_VERSION does not match release tag $REF_NAME"
+          exit 1
+        fi
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v3
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Check immutable release chart
+      id: release-chart
+      env:
+        CHART: europe-west3-docker.pkg.dev/prokube/releases/helm/local-storage-exporter:${{ github.ref_name }}
+      run: |
+        CHART_VERSION="${CHART##*:}"
+        CHART_VERSION="${CHART_VERSION#helm-v}"
+        CHART="${CHART%:*}:${CHART_VERSION}"
+        if output=$(gcloud artifacts docker images describe "$CHART" 2>&1); then
+          echo "$CHART already exists; preserving the immutable release artifact"
+          echo "should_push=false" >> "$GITHUB_OUTPUT"
+        elif [[ "$output" == *"NOT_FOUND"* || "$output" == *"Image not found"* ]]; then
+          echo "should_push=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "$output" >&2
+          exit 1
+        fi
+
+    - name: Log in to Google Artifact Registry
+      if: steps.release-chart.outputs.should_push == 'true'
       uses: docker/login-action@v4
       with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        registry: europe-west3-docker.pkg.dev
+        username: _json_key
+        password: ${{ secrets.GCP_SA_KEY }}
 
     - name: Package the Helm chart and push to Artifact Registry
+      if: steps.release-chart.outputs.should_push == 'true'
       run: |
         set -euo pipefail
+
+        CHART_VERSION="${GITHUB_REF_NAME#helm-v}"
 
         # Helm packages the chart as {chart-name}-{version}.tgz
         helm package helm_chart --destination ./helm_chart/dist
 
-        # A wildcard is used to match the versioned chart file
         # helm push automatically tags the chart with the version from Chart.yaml
-        helm push ./helm_chart/dist/local-storage-exporter-*.tgz oci://ghcr.io/prokube/helm
+        helm push "./helm_chart/dist/local-storage-exporter-${CHART_VERSION}.tgz" oci://europe-west3-docker.pkg.dev/prokube/releases/helm
