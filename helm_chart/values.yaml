@@ -19,7 +19,7 @@ updateInterval: 30s
 # -- Container image configuration
 image:
   # -- Image repository
-  repository: europe-west3-docker.pkg.dev/prokube/releases/local-storage-exporter
+  repository: ghcr.io/prokube/local-storage-exporter
   # -- Image pull policy (Always, IfNotPresent, Never)
   pullPolicy: IfNotPresent
   # -- Overrides the image tag whose default is the chart appVersion

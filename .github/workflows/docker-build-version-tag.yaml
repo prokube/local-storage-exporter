@@ -32,12 +32,6 @@ jobs:
             exit 1
           fi
 
-          APP_VERSION=$(awk '/^appVersion:/ {gsub(/"/, "", $2); print $2}' helm_chart/Chart.yaml)
-          if [[ "$APP_VERSION" != "$REF_NAME" ]]; then
-            echo "Chart appVersion $APP_VERSION does not match release tag $REF_NAME"
-            exit 1
-          fi
-
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:

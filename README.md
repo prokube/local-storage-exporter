@@ -45,8 +45,8 @@ storagePaths:
 
 # Container image configuration
 image:
-  repository: europe-west3-docker.pkg.dev/prokube/releases/local-storage-exporter # Or your custom registry/repo
-  # tag: "v0.2.2"  # If omitted, defaults to the chart's appVersion
+  repository: ghcr.io/prokube/local-storage-exporter # Or your custom registry/repo
+  # tag: "0.1.0"  # If omitted, defaults to the chart's appVersion
   pullPolicy: IfNotPresent
 
 # Private registry authentication (optional)
